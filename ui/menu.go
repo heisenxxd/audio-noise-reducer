@@ -12,48 +12,48 @@ import (
 )
 
 func Menu() (*audio.DeviceInfo, *audio.DeviceInfo, *audio.Manager, error) {
-    reader := bufio.NewReader(os.Stdin)
-    
-    for {
-        printMainMenu()
-        escolha := readInput(reader)
-        
-        switch escolha {
-        case "1":
-            manager, err := audio.NewManager()
-            if err != nil {
-                return nil, nil, nil, fmt.Errorf("erro ao criar manager: %w", err)
-            }
-            
-            fmt.Println("\n=== DISPOSITIVO DE ENTRADA (Microfone) ===")
-            inputDevice, err := DeviceListMenu(reader, manager, malgo.Capture)
-            if err != nil {
-                manager.Close()
-                fmt.Printf("Erro: %v\n", err)
-                continue
-            }
-            
-            fmt.Println("\n=== DISPOSITIVO DE SAÍDA (Output Virtual) ===")
-            outputDevice, err := DeviceListMenu(reader, manager, malgo.Playback)
-            if err != nil {
-                manager.Close()
-                fmt.Printf("Erro: %v\n", err)
-                continue
-            }
-            
-            fmt.Printf("\n- Entrada: %s\n", inputDevice.Name())
-            fmt.Printf("- Saída: %s\n", outputDevice.Name())
-            
-            return inputDevice, outputDevice, manager, nil
-            
-        case "2":
-            fmt.Println("Saindo...")
-            return nil, nil, nil, nil
-            
-        default:
-            fmt.Println("Opção inválida! Tente novamente.")
-        }
-    }
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		printMainMenu()
+		escolha := readInput(reader)
+
+		switch escolha {
+		case "1":
+			manager, err := audio.NewManager()
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("erro ao criar manager: %w", err)
+			}
+
+			fmt.Println("\n=== DISPOSITIVO DE ENTRADA (Microfone) ===")
+			inputDevice, err := DeviceListMenu(reader, manager, malgo.Capture)
+			if err != nil {
+				manager.Close()
+				fmt.Printf("Erro: %v\n", err)
+				continue
+			}
+
+			fmt.Println("\n=== DISPOSITIVO DE SAÍDA (Output Virtual) ===")
+			outputDevice, err := DeviceListMenu(reader, manager, malgo.Playback)
+			if err != nil {
+				manager.Close()
+				fmt.Printf("Erro: %v\n", err)
+				continue
+			}
+
+			fmt.Printf("\n- Entrada: %s\n", inputDevice.Name())
+			fmt.Printf("- Saída: %s\n", outputDevice.Name())
+
+			return inputDevice, outputDevice, manager, nil
+
+		case "2":
+			fmt.Println("Saindo...")
+			return nil, nil, nil, nil
+
+		default:
+			fmt.Println("Opção inválida! Tente novamente.")
+		}
+	}
 }
 
 func DeviceListMenu(reader *bufio.Reader, manager *audio.Manager, deviceType malgo.DeviceType) (*audio.DeviceInfo, error) {
@@ -114,11 +114,11 @@ func printDeviceList(devices []malgo.DeviceInfo, tipo string) {
 	fmt.Println("\n========================================")
 	fmt.Printf("  	Selecione o Dispositivo de %s\n", tipo)
 	fmt.Println("========================================")
-	
+
 	for i, device := range devices {
 		fmt.Printf("[%d] - %s", i+1, device.Name())
 		if device.IsDefault == 1 {
-			fmt.Print("- (Padrão)")
+			fmt.Print(" - (Padrão)")
 		}
 		fmt.Println()
 	}
