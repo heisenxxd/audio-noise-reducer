@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package audio;
+
+option go_package = "audio/grpc/proto";
+
+service AudioProcessor {
+  rpc ProcessAudio(AudioChunk) returns (AudioChunk);
+  
+  rpc ProcessAudioStream(stream AudioChunk) returns (stream AudioChunk);
+}
+
+message AudioChunk {
+  bytes audio_data = 1;     
+  int32 sample_rate = 2;    
+  int32 channels = 3;      
+  int32 format = 4;        
+  int64 timestamp = 5;      
+}
