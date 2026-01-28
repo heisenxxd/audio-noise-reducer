@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	pb "audio/grpc/proto"
 
@@ -15,9 +14,10 @@ import (
 type Client struct {
 	conn   *grpc.ClientConn
 	client pb.AudioProcessorClient
+	stream pb.AudioProcessor_ProcessAudioStreamClient
 }
 
-func NewClient(serverAddress string) (*Client, error) {
+func NewClient(ctx context.Context, serverAddress string) (*Client, error) {
 	log.Printf("Conectando ao servidor gRPC em %s...", serverAddress)
 
 	conn, err := grpc.NewClient(
@@ -28,52 +28,44 @@ func NewClient(serverAddress string) (*Client, error) {
 		return nil, fmt.Errorf("erro ao criar cliente: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	client := pb.NewAudioProcessorClient(conn)
 
-	_, err = client.ProcessAudio(ctx, &pb.AudioChunk{
-		AudioData:  []byte{},
-		SampleRate: 48000,
-		Channels:   1,
-		Format:     16,
-	})
-
-	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("erro ao conectar ao servidor: %w", err)
-	}
-
 	log.Println("Conectado ao servidor gRPC")
+
+	stream, err := client.ProcessAudioStream(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao abrir stream: %w", err)
+	}
 
 	return &Client{
 		conn:   conn,
 		client: client,
+		stream: stream,
 	}, nil
 }
 
 func (c *Client) ProcessAudio(audioData []byte, sampleRate, channels int32) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
 	request := &pb.AudioChunk{
 		AudioData:  audioData,
 		SampleRate: sampleRate,
 		Channels:   channels,
-		Format:     16, 
-		Timestamp:  time.Now().UnixNano(),
+	}
+	if err := c.stream.Send(request); err != nil {
+		return nil, err
 	}
 
-	response, err := c.client.ProcessAudio(ctx, request)
+	response, err := c.stream.Recv()
 	if err != nil {
-		return nil, fmt.Errorf("erro ao processar áudio: %w", err)
+		return nil, err
 	}
 
 	return response.AudioData, nil
 }
 
 func (c *Client) Close() error {
+	if c.stream != nil {
+		c.stream.CloseSend()
+	}
 	if c.conn != nil {
 		log.Println("Fechando conexão gRPC...")
 		return c.conn.Close()

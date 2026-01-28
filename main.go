@@ -4,6 +4,7 @@ import (
 	"audio/audio"
 	"audio/grpc"
 	"audio/ui"
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -24,7 +25,11 @@ func main() {
 
 	fmt.Println("Conectando ao servidor GRPC")
 
-	grpcClient, err := grpc.NewClient("localhost:50051")
+	ctx, cancel := context.WithCancel(context.Background())
+
+	defer cancel()
+
+	grpcClient, err := grpc.NewClient(ctx, "localhost:50051")
 	if err != nil {
 		log.Fatalf("Erro ao conectar com o servidor GRPC, erro: %s", err)
 	}
@@ -34,7 +39,7 @@ func main() {
 	fmt.Println("Conexão estabelecida com sucesso.")
 
 	fmt.Println("Iniciando Stream de áudio")
-	stream, err := audio.NewAudioStream(manager, CaptureDevice, PlaybackDevice, grpcClient)
+	stream, err := audio.NewAudioStream(ctx, cancel, manager, CaptureDevice, PlaybackDevice, grpcClient)
 	if err != nil {
 		log.Fatalf("Erro ao criar stream de áudio, erro: %s", err)
 	}
@@ -56,6 +61,7 @@ func main() {
 	<-signChan
 
 	fmt.Println("Parando processamento")
+	cancel()
 	stream.Stop()
 	fmt.Println("Finalizado com sucesso")
 }

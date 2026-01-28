@@ -25,8 +25,7 @@ type AudioStream struct {
 	processingChan chan []byte
 }
 
-func NewAudioStream(manager *Manager, inputDeviceInfo, outputDeviceInfo *DeviceInfo, processor Processor) (*AudioStream, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+func NewAudioStream(ctx context.Context, cancel context.CancelFunc, manager *Manager, inputDeviceInfo, outputDeviceInfo *DeviceInfo, processor Processor) (*AudioStream, error) {
 
 	bufferSize := int(2 * 48000 * 1 * 0.2)
 
