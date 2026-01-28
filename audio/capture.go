@@ -13,21 +13,22 @@ type Processor interface {
 }
 
 type AudioStream struct {
-	manager       *Manager
-	inputDevice   *malgo.Device
-	outputDevice  *malgo.Device
-	processor     Processor
-	ctx           context.Context
-	cancel        context.CancelFunc
-	sampleRate    uint32
-	channels      uint32
+	manager        *Manager
+	inputDevice    *malgo.Device
+	outputDevice   *malgo.Device
+	processor      Processor
+	ctx            context.Context
+	cancel         context.CancelFunc
+	sampleRate     uint32
+	channels       uint32
 	playbackBuffer *RingBuffer
+	processingChan chan []byte
 }
 
 func NewAudioStream(manager *Manager, inputDeviceInfo, outputDeviceInfo *DeviceInfo, processor Processor) (*AudioStream, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	bufferSize := 2 * 48000 * 1 * 2
+	bufferSize := int(2 * 48000 * 1 * 0.2)
 
 	stream := &AudioStream{
 		manager:        manager,
@@ -37,6 +38,7 @@ func NewAudioStream(manager *Manager, inputDeviceInfo, outputDeviceInfo *DeviceI
 		sampleRate:     48000,
 		channels:       1,
 		playbackBuffer: NewRingBuffer(bufferSize),
+		processingChan: make(chan []byte, 100),
 	}
 
 	if err := stream.initCaptureDevice(inputDeviceInfo); err != nil {
@@ -51,6 +53,15 @@ func NewAudioStream(manager *Manager, inputDeviceInfo, outputDeviceInfo *DeviceI
 	}
 
 	return stream, nil
+}
+
+func (s *AudioStream) processWorker() {
+	for audioData := range s.processingChan {
+		processed, err := s.processor.ProcessAudio(audioData, int32(s.sampleRate), int32(s.channels))
+		if err == nil {
+			s.playbackBuffer.Write(processed)
+		}
+	}
 }
 
 func (s *AudioStream) initCaptureDevice(deviceInfo *DeviceInfo) error {
@@ -81,7 +92,7 @@ func (s *AudioStream) initPlaybackDevice(deviceInfo *DeviceInfo) error {
 	deviceConfig.SampleRate = s.sampleRate
 
 	callbacks := malgo.DeviceCallbacks{
-		Data: s.onPlaybackData, 
+		Data: s.onPlaybackData,
 	}
 
 	device, err := malgo.InitDevice(s.manager.Context(), deviceConfig, callbacks)
@@ -98,31 +109,18 @@ func (s *AudioStream) onCaptureData(pOutputSample, pInputSample []byte, frameCou
 		return
 	}
 
-	go func(audioData []byte) {
-		processedAudio, err := s.processor.ProcessAudio(
-			audioData,
-			int32(s.sampleRate),
-			int32(s.channels),
-		)
-
-		if err != nil {
-			log.Printf("Erro ao processar áudio: %v", err)
-			return
-		}
-
-		written := s.playbackBuffer.Write(processedAudio)
-		if written < len(processedAudio) {
-			log.Printf("Buffer cheio! Descartados %d bytes", len(processedAudio)-written)
-		}
-	}(append([]byte(nil), pInputSample...))
+	select {
+	case s.processingChan <- append([]byte(nil), pInputSample...):
+	default:
+		log.Println("Aviso: Fila de processamento cheia, descartando frame")
+	}
 }
-
 
 func (s *AudioStream) onPlaybackData(pOutputSample, pInputSample []byte, frameCount uint32) {
 	if len(pOutputSample) == 0 {
 		return
 	}
-	
+
 	bytesRead := s.playbackBuffer.Read(pOutputSample)
 
 	if bytesRead < len(pOutputSample) {
@@ -133,6 +131,8 @@ func (s *AudioStream) onPlaybackData(pOutputSample, pInputSample []byte, frameCo
 }
 
 func (s *AudioStream) Start() error {
+	go s.processWorker()
+
 	if err := s.outputDevice.Start(); err != nil {
 		return fmt.Errorf("erro ao iniciar reprodução: %w", err)
 	}
@@ -181,6 +181,8 @@ func (s *AudioStream) Close() error {
 	if s.outputDevice != nil {
 		s.outputDevice.Uninit()
 	}
+
+	close(s.processingChan)
 
 	return nil
 }

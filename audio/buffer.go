@@ -33,11 +33,17 @@ func (rb *RingBuffer) Write(data []byte) int {
 		n = rb.Available()
 	}
 
-	for i := 0; i < n; i++ {
-		rb.buffer[rb.write] = data[i]
-		rb.write = (rb.write + 1) % rb.size
+	part1 := rb.size - rb.write
+	if part1 > n {
+		part1 = n
+	}
+	copy(rb.buffer[rb.write:], data[:part1])
+
+	if n > part1 {
+		copy(rb.buffer[0:], data[part1:n])
 	}
 
+	rb.write = (rb.write + n) % rb.size
 	rb.cond.Signal()
 	return n
 }
@@ -48,17 +54,31 @@ func (rb *RingBuffer) Read(data []byte) int {
 
 	n := len(data)
 	available := rb.Used()
-	
 	if n > available {
 		n = available
 	}
 
-	for i := 0; i < n; i++ {
-		data[i] = rb.buffer[rb.read]
-		rb.read = (rb.read + 1) % rb.size
+	actualRead := n
+
+	part1 := rb.size - rb.read
+	if part1 > actualRead {
+		part1 = actualRead
+	}
+	copy(data[:part1], rb.buffer[rb.read:])
+
+	if actualRead > part1 {
+		copy(data[part1:actualRead], rb.buffer[0:])
 	}
 
-	return n
+	rb.read = (rb.read + actualRead) % rb.size
+
+	if len(data) > actualRead {
+		for i := actualRead; i < len(data); i++ {
+			data[i] = 0
+		}
+	}
+
+	return actualRead
 }
 
 func (rb *RingBuffer) Used() int {

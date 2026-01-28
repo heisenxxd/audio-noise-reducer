@@ -14,7 +14,7 @@ import (
 func main() {
 	CaptureDevice, PlaybackDevice, manager, err := ui.Menu()
 	if err != nil {
-		fmt.Errorf("Erro: %w", err)
+		log.Fatalf("Erro: %s", err)
 	}
 	if manager == nil {
 		fmt.Println("Até")
@@ -26,7 +26,7 @@ func main() {
 
 	grpcClient, err := grpc.NewClient("localhost:50051")
 	if err != nil {
-		log.Fatalf("Erro ao conectar com o servidor GRPC, erro: %w", err)
+		log.Fatalf("Erro ao conectar com o servidor GRPC, erro: %s", err)
 	}
 
 	defer grpcClient.Close()
@@ -36,7 +36,7 @@ func main() {
 	fmt.Println("Iniciando Stream de áudio")
 	stream, err := audio.NewAudioStream(manager, CaptureDevice, PlaybackDevice, grpcClient)
 	if err != nil {
-		log.Fatalf("Erro ao criar stream de áudio, erro: %w", err)
+		log.Fatalf("Erro ao criar stream de áudio, erro: %s", err)
 	}
 
 	defer stream.Close()
@@ -48,8 +48,8 @@ func main() {
 
 	fmt.Println("\nProcessando áudio em tempo real")
 	fmt.Printf("Capturando de: %s\n", CaptureDevice.Name())
-	fmt.Println("Reproduzindo áudio em: %s\n", PlaybackDevice)
-	fmt.Println("Pressione Ctrl+C para parar \n")
+	fmt.Printf("Reproduzindo áudio em: %s\n", PlaybackDevice)
+	fmt.Println("Pressione Ctrl+C para parar")
 
 	signChan := make(chan os.Signal, 1)
 	signal.Notify(signChan, os.Interrupt, syscall.SIGTERM)
